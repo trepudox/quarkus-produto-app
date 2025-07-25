@@ -1,0 +1,60 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: produto-rabbitmq
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    hostname: rabbitmq
+    ports:
+      - 5672:5672
+      - 15672:15672
+    networks:
+      - default-network
+
+  postgres:
+    image: postgres
+    container_name: produto-postgres
+    environment:
+      - PGUSER=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - db-data:/usr/db-data
+    ports:
+      - 5432:5432
+    networks:
+      - default-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  produto-api:
+    build:
+      context: ./quarkus-produto-api
+      dockerfile: src/main/docker/Dockerfile.native
+    container_name: produto-api
+    environment:
+      - POSTGRES_ADDRESS=172.19.0.1
+      - RABBITMQ_ADDRESS=rabbitmq
+    links:
+      - postgres
+      - rabbitmq
+    ports:
+      - 8080:8080
+    networks:
+      - default-network
+    restart: on-failure
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  rabbitmq_data:
+  db-data:
+
+networks:
+  default-network:
+    driver: bridge
